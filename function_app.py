@@ -6,6 +6,8 @@ import json
 import logging
 import requests
 from dotenv import load_dotenv
+import pandas as pd
+from azure.storage.blob import BlobServiceClient
 
 
 app = func.FunctionApp()
@@ -33,7 +35,10 @@ def QueueTriggerPokeReport(azqueue: func.QueueMessage):
 
     request_info = get_request(id)
     pokemons = get_pokemons(request_info[0]["type"])
-    logging.info(pokemons)
+    pokemons_bytes = generate_csv_to_blob(pokemons) 
+    blob_name= f"poke_report_{id}.csv"
+    upload_csv_to_blob(blob_name=blob_name, csv_data=pokemons_bytes)
+    logger.info(f"Archivo {blob_name} subido correctamente al contenedor")    
 
     update_request(id, "completed")
 
@@ -59,3 +64,20 @@ def get_pokemons( type: str ) -> dict:
     data = response.json()
     pokemon_entries = data.get("pokemon", [] )
     return [ p["pokemon"] for p in pokemon_entries ]
+
+def generate_csv_to_blob( pokemon_list: list ) -> bytes:
+    df = pd.DataFrame( pokemon_list )
+    output = io.StringIO()
+    df.to_csv( output , index=False, encoding='utf-8' )
+    csv_bytes = output.getvalue().encode('utf-8')
+    output.close()
+    return csv_bytes
+
+def upload_csv_to_blob( blob_name: str, csv_data: bytes ):
+    try:
+        blob_service_client = BlobServiceClient.from_connection_string( AZURE_STORAGE_CONNECTION_STRING)
+        blob_client = blob_service_client.get_blob_client( container = BLOB_CONTAINER_NAME, blob=blob_name )
+        blob_client.upload_blob( csv_data , overwrite=True )
+    except Exception as e:
+        logger.error(f"Error al subir el archivo {e} ")
+        raise
