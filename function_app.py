@@ -38,9 +38,11 @@ def QueueTriggerPokeReport(azqueue: func.QueueMessage):
     pokemons_bytes = generate_csv_to_blob(pokemons) 
     blob_name= f"poke_report_{id}.csv"
     upload_csv_to_blob(blob_name=blob_name, csv_data=pokemons_bytes)
-    logger.info(f"Archivo {blob_name} subido correctamente al contenedor")    
+    logger.info(f"Archivo {blob_name} subido correctamente al contenedor")   
 
-    update_request(id, "completed")
+    url_completa=f"https://{STORA_ACCOUNT_NAME}.blob.core.windows.net/{BLOB_CONTAINER_NAME}/{blob_name}"
+
+    update_request(id, "completed", url_completa)
 
 
 def update_request( id: int, status: str, url: str = None ) -> dict:
